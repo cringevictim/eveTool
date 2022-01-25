@@ -212,7 +212,7 @@ sql.execute("""CREATE TABLE IF NOT EXISTS paths (
 
 array = {34, 35, 36, 37, 38, 39, 40}
 
-for id in range(30000):
+for id in range(30000):#12075 поставь фолс на очистку
     api = get_api(id)
     fill_database(id, api)
     compress_buy_orders(id, 5)
