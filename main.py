@@ -1,6 +1,8 @@
 import requests
 import json
 import sqlite3
+import tkinter
+from tkinter import *
 
 debug_mode = False
 semi_debug_mode = True
@@ -8,13 +10,56 @@ semi_debug_mode = True
 def get_api(type_id):
     if debug_mode:
         print("Getting api (ID " + str(type_id) + ")")
-    if semi_debug_mode:
-        print("Searching for (ID " + str(type_id) + ")")
     api_request = requests.get("https://evetycoon.com/api/v1/market/orders/"+str(type_id))
     api_data = json.loads(api_request.text)
     if debug_mode:
         print("Api received")
     return api_data
+
+def process_list(starting_group_id, api, list):
+    for obj in api: #расширение списка идентификаторами групп
+        if len(obj) == 8:
+            if int(obj["parentGroupID"]) == starting_group_id:
+                list.append(obj["marketGroupID"])
+
+    for obj1 in api:
+        for group_id in list:
+            if int(obj1["marketGroupID"]) == group_id:
+                if obj1["hasTypes"] is False:
+                    list.remove(int(obj1["marketGroupID"]))
+                    process_list(group_id, api, list)
+    return
+
+def get_ids(group_id, ids, names):
+    if debug_mode:
+        print("Getting id's (GroupID " + str(group_id) + ")")
+    if semi_debug_mode:
+        print("Getting id's (GroupID " + str(group_id) + ")")
+
+    api_request = requests.get("https://evetycoon.com/api/v1/market/groups")# + str(group_id))
+    api = json.loads(api_request.text)
+
+    lst = []
+
+    process_list(group_id, api, lst)
+
+    for group_id in lst:
+        api_request = requests.get("https://evetycoon.com/api/v1/market/groups/" + str(group_id) + "/types")
+        api = json.loads(api_request.text)
+        for obj in api:
+            ids.append(obj["typeID"])
+            names.append(obj["typeName"])
+
+    if debug_mode:
+        print(ids)
+        print(names)
+        print("Amount: " + str(len(ids)))
+        print("ID's recieved")
+    if semi_debug_mode:
+        print("Amount: " + str(len(ids)))
+        print("ID's recieved")
+
+    return ids
 
 def fill_database(type_id, api_data):
     if debug_mode:
@@ -133,9 +178,11 @@ def destination_name(id, api_data):
     else:
         return api_data["stationNames"][str(id)]
 
-def search(id, minimal_profit, api, security):
+def search(id, name, minimal_profit, api, security):
     if debug_mode:
-        print("Searching (ID " + str(id) + ")")
+        print("Searching for [" + name + "] (ID " + str(id) + ")")
+    if semi_debug_mode:
+        print("Searching for [" + name + "] (ID " + str(id) + ")")
     sql.execute("SELECT COUNT(*) FROM orders WHERE is_buy_order = 0 AND type_id = "+str(id)+" AND security >= "+str(security))
     sell_orders = int(str(sql.fetchone()[0]))
     sql.execute("SELECT COUNT(*) FROM orders WHERE is_buy_order = 1 AND type_id = "+str(id)+" AND security >= "+str(security))
@@ -172,9 +219,29 @@ def search(id, minimal_profit, api, security):
                 destination_name(object1[counter1][6], api),
                 destination_name(object2[counter2][6], api)))
     if debug_mode:
-        print("Matches (ID " + str(id) + "): " + str(counter))
-        print("Complete")
+        print("Matches for [" + name + "] (ID " + str(id) + "): " + str(counter))
+    if semi_debug_mode:
+        print("Matches for [" + name + "] (ID " + str(id) + "): " + str(counter))
     return
+
+def advanced_search(group_id, minimal_profit):
+    ids = []
+    names = []
+    get_ids(group_id, ids, names)
+    counter = 0
+    for id in ids:
+        api = get_api(id)
+        fill_database(id, api)
+        compress_buy_orders(id, 5)
+        compress_sell_orders(id, 5)
+        search(id, names[counter], minimal_profit, api, 0.5)
+        if counter % 25 == 0 and counter != 0:
+            print("Database was committed")
+            db.commit()
+        counter += 1
+    db.commit()
+    if debug_mode:
+        print("Database was committed")
 
 db = sqlite3.connect('orders.db')
 sql = db.cursor()
@@ -210,17 +277,23 @@ sql.execute("""CREATE TABLE IF NOT EXISTS paths (
     starting_station_name STRING,
     ending_station_name STRING)""")
 
-array = {34, 35, 36, 37, 38, 39, 40}
+# window = Tk()
+# window.title("eveTool by Gusb")
+# window.configure(width=800, height=450)
+# window.configure(bg='lightgray')
+# window.mainloop()
 
-for id in range(30000):#12075 поставь фолс на очистку
-    api = get_api(id)
-    fill_database(id, api)
-    compress_buy_orders(id, 5)
-    compress_sell_orders(id, 5)
-    search(id, 30_000_000, api, 0.5)
-    if id % 25 == 0:
-        print("Database was committed")
-        db.commit()
-db.commit()
-if debug_mode:
-    print("Database was committed")
+
+#Manufacture & Research - 475
+#Ships - 4
+#Implants & Boosters - 24
+#Ship Equipment - 9
+#Ship and Module Modifications - 955
+#Pilot's Servises - 1922
+#Drones - 157
+
+
+#Materials - 533
+#Gas - 1032
+advanced_search(157, 30_000_000)
+
