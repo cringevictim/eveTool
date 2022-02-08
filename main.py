@@ -224,6 +224,8 @@ def search(id, name, minimal_profit, api, security):
         print("Matches for [" + name + "] (ID " + str(id) + "): " + str(counter))
     return
 
+print("debug")
+
 def advanced_search(group_id, minimal_profit):
     ids = []
     names = []
