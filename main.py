@@ -1,8 +1,6 @@
 import requests
 import json
 import sqlite3
-import tkinter
-from tkinter import *
 
 debug_mode = False
 semi_debug_mode = True
@@ -181,8 +179,6 @@ def destination_name(id, api_data):
 def search(id, name, minimal_profit, api, security):
     if debug_mode:
         print("Searching for [" + name + "] (ID " + str(id) + ")")
-    if semi_debug_mode:
-        print("Searching for [" + name + "] (ID " + str(id) + ")")
     sql.execute("SELECT COUNT(*) FROM orders WHERE is_buy_order = 0 AND type_id = "+str(id)+" AND security >= "+str(security))
     sell_orders = int(str(sql.fetchone()[0]))
     sql.execute("SELECT COUNT(*) FROM orders WHERE is_buy_order = 1 AND type_id = "+str(id)+" AND security >= "+str(security))
@@ -203,8 +199,9 @@ def search(id, name, minimal_profit, api, security):
             if profit < minimal_profit:
                 continue
             counter = counter + 1
-            sql.execute("INSERT INTO paths VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            sql.execute("INSERT INTO paths VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
                 object1[counter1][1],
+                name,
                 sp,
                 bp,
                 volume,
@@ -220,11 +217,10 @@ def search(id, name, minimal_profit, api, security):
                 destination_name(object2[counter2][6], api)))
     if debug_mode:
         print("Matches for [" + name + "] (ID " + str(id) + "): " + str(counter))
-    if semi_debug_mode:
+    if semi_debug_mode and counter != 0:
         print("Matches for [" + name + "] (ID " + str(id) + "): " + str(counter))
     return
 
-print("debug")
 
 def advanced_search(group_id, minimal_profit):
     ids = []
@@ -240,10 +236,22 @@ def advanced_search(group_id, minimal_profit):
         if counter % 25 == 0 and counter != 0:
             print("Database was committed")
             db.commit()
+            #print_top(5)
         counter += 1
     db.commit()
-    if debug_mode:
-        print("Database was committed")
+
+def print_top(count):
+    sql.execute("SELECT * FROM paths order by profit DESC")
+    top = sql.fetchall()
+    top = top[:count]
+    print("-------------------------------------------- UPDATED TOP --------------------------------------------")
+    for obj in top:
+        print("[ID: " + str(obj[0]) + ", NAME: "+obj[1]+", SELL_PRICE: " + str(int(obj[2])) + ", BUY_PRICE: " + str(
+            int(obj[3])) + ", AMOUNT: "
+              + str(obj[4]) + ", VOLUME: " + str(obj[5]) + ", PROFIT: " + str(
+            obj[7]) + ", ISK/M3: " + str(obj[8]) + ", START: "
+              + str(obj[13]) + ", END: " + str(obj[14])+"]")
+    print("-----------------------------------------------------------------------------------------------------")
 
 db = sqlite3.connect('orders.db')
 sql = db.cursor()
@@ -265,6 +273,7 @@ sql.execute("""CREATE TABLE IF NOT EXISTS orders (
 
 sql.execute("""CREATE TABLE IF NOT EXISTS paths (
     type_id INT,
+    name STRING,
     sell_price FLOAT,
     buy_price FLOAT,
     amount BIGINT,
@@ -279,23 +288,18 @@ sql.execute("""CREATE TABLE IF NOT EXISTS paths (
     starting_station_name STRING,
     ending_station_name STRING)""")
 
-# window = Tk()
-# window.title("eveTool by Gusb")
-# window.configure(width=800, height=450)
-# window.configure(bg='lightgray')
-# window.mainloop()
+
+# Manufacture & Research - 475
+# Ships - 4
+# Implants & Boosters - 24
+# Ship Equipment - 9
+# Ship and Module Modifications - 955
+# Pilot's Servises - 1922
+# Drones - 157
 
 
-#Manufacture & Research - 475
-#Ships - 4
-#Implants & Boosters - 24
-#Ship Equipment - 9
-#Ship and Module Modifications - 955
-#Pilot's Servises - 1922
-#Drones - 157
-
-
-#Materials - 533
-#Gas - 1032
-advanced_search(157, 30_000_000)
+# Materials - 533
+# Gas - 1032
+advanced_search(533, 30_000_000)
+print_top(20)
 
